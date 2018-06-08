@@ -1,6 +1,7 @@
 ## coded by Trixi (with Manuelas & Alessandros help)
-## look at distribution of fines for different frames/Vins as 2d histogram
-## Vin/frame vs fine
+## look at distribution of fines for a given Vin (=for the time given frame) 
+##  -- for those ADCs for which coarse is always the same !! --
+## as 1d histogram (=> should give a first VERY ROUGH idea about noise ...)
 
 
 import matplotlib
@@ -22,20 +23,18 @@ class Plot(PlotBase):
     def __init__(self, **kwargs):  # noqa F401
         # overwrite the configured col and row indices
         new_kwargs = copy.deepcopy(kwargs)
-        new_kwargs["frame"] = None
-        new_kwargs["dims_overwritten"] = True
+        #new_kwargs["frame"] = None
+        #new_kwargs["dims_overwritten"] = True
 
         super().__init__(**new_kwargs)
 
     def plot_sample(self):
         self.create_dir()
 
-#        title = ("Vin={}V, Sample: Row={}, Col={}"
-#                 .format(self._vin, self._row, self._col))
-        title = ("allFrames, Sample: Row={}, Col={}, ADC={}"
-                 .format(self._row, self._col, self._adc))
+        title = ("Frame={}, Sample: Row={}, Col={}, ADC={}"
+                 .format(self._frame, self._row, self._col, self._adc))
         out = os.path.join(self._output_dir,
-                           "raw_2dHist_frame_vs_fine_row{}_col{}_adc{}"
+                           "raw_1dHist_fine_fixedCrs_row{}_col{}_adc{}"
                            .format(self._row, self._col, self._adc))
 
 
@@ -44,53 +43,50 @@ class Plot(PlotBase):
         cmap = matplotlib.pyplot.cm.jet
         cmap.set_under(color='white')
 
-        ## this segment of code sorts out the array needed to have the
-        ## proper frame number available for the X axis of the histogram
-        ## before filling data into the histogram
-        
-        print("shape", self._data["s_fine"].shape)
-
-        fine_min = np.min(self._data["s_fine"])
-        fine_max = np.max(self._data["s_fine"])
-        print("fine_min", fine_min)
-        print("fine_max", fine_max)
-
-        s_fine = self._data["s_fine"]
-        print(s_fine.shape)
-        s_fine = s_fine.transpose(1,0)
-        print(s_fine.shape)
-
-        ## once we know the dimensions of the array, create one single column with
-        ## the right repetitions of the frame number for all rows / adcs included
-        ## in the data set.
-        
-        n_frame = self._data["s_fine"].shape[0]
-        print("n_frame", n_frame)
-        n_dp_per_frame = self._data["s_fine"].shape[1]
-        print("n_dp_per_frame", n_dp_per_frame)
-
-        frames = np.array([np.arange(n_frame)
-                           for i in np.arange(n_dp_per_frame)]).flatten()
-        print("frames", frames)
-
         ## now generate the histogram itself
         
-        plt.hist2d(frames, s_fine.flatten(), cmap=cmap, vmin=0.1, bins=[n_frame,(fine_max-fine_min+1)], range=[[-0.5,(n_frame+0.5)],[(fine_min-0.5),(fine_max+0.5)]])
+        s_fine = self._data["s_fine"]
+        s_coarse = self._data["s_coarse"]
+ 
+        fines = s_fine.flatten()
+        crses = s_coarse.flatten()
 
-        plt.colorbar()
+        fine_min = np.min(fines)
+        fine_max = np.max(fines)
 
-        fig.suptitle(title)
-        plt.xlabel("frame")
-        plt.ylabel("fn")
+	## ascertain all crses are identical:
+        no_crses = crses.shape[0]
+        eq_crses = crses[crses == crses[0]]
+        no_eq_crses = eq_crses.shape[0]
 
-        fig.savefig(out)
+        print("Number of coarse values: ", no_crses)
+        print("Number of equal coarse values: ", no_eq_crses)
 
-        fig.show()
 
-        input('Press enter to end')
+        if (no_crses == no_eq_crses) :
 
-        fig.clf()
-        plt.close(fig)
+            #n, bins, patches = plt.hist(s_fine.flatten(), bins=(fine_max-fine_min+1), range=[(fine_min-0.5),(fine_max+0.5)], histtype='bar')
+
+            plt.hist(s_fine.flatten(), bins=(fine_max-fine_min+1), range=[(fine_min-0.5),(fine_max+0.5)], histtype='bar')
+
+            fig.suptitle(title)   
+            plt.xlabel("fine value")
+            plt.ylabel("number of occurrences")
+            
+            plt.axis([0,255,0,500]
+
+            fig.savefig(out) 
+
+            fig.show()
+            plt.show()
+
+            input('Press enter to end')
+
+            fig.clf()
+            plt.close(fig)
+
+        if (no_crses != no_eq_crses) :
+            print("Not all coarses identical for this data set, no plot")
 
     def plot_reset(self):
         pass
